@@ -175,7 +175,7 @@ CRGB lerp_toward_target_colors(CRGB& old, CRGB& target, float dt, Animation_Stat
   return X;
 }
 
-/* void drawPixel(float x, float y, CRGB& pixel_color){
+void drawPixel(float x, float y, CRGB pixel_color){
 
   int x_pos = x*MatrixHeight;
   int y_pos = y;
@@ -185,7 +185,7 @@ CRGB lerp_toward_target_colors(CRGB& old, CRGB& target, float dt, Animation_Stat
 
   LedMatrix[x_pos+y_pos] =  pixel_color;
   //setPixel(pMatrix[x_pos+y_pos], interpolate_colors_with_black(A, B, Func( x_new, y_new, t , states.function) ) );
-} */
+}
 
 void Animation(float t, float dt, Animation_States& states){
 
@@ -207,36 +207,13 @@ void Animation(float t, float dt, Animation_States& states){
 
   float rotation = t * states.rotate_scale;
 
- /*  for(uint16_t i = 0; i < NUM_LEDS; i++){
+  for(uint16_t i = 0; i < NUM_LEDS; i++){
     uint16_t x = i/MatrixHeight;
     uint16_t y = i%MatrixHeight;
     float x_new = ( ( ( x - pivot_x  ) * cos(rotation) - ( y - pivot_y ) * sin(rotation) ) * zoom ) + pivot_x - states.offset_x;
     float y_new = ( ( ( y - pivot_y  ) * sin(rotation) + ( y - pivot_y  )* cos(rotation) ) * zoom ) + pivot_y - states.offset_y;
-    //drawPixel(x_new, y_new, color);
-    int x_pos = x*MatrixHeight;
-    int y_pos = y;
-    if(((int)x & 0x1)) {
-     y_pos = MatrixHeight-1 - y;
-    }
-    LedMatrix[x_pos+y_pos] =  interpolate_colors_with_black(A, B, Func( x_new, y_new, t , states.function) );;
-  } */
-
-for(int x = 0; x < MatrixLength; ++x) {
-    int x_pos = x*MatrixHeight;
-    for(int y = 0; y < MatrixHeight; ++y) {
-
-      int y_pos = y;
-      if((x & 0x1)) {
-        y_pos = MatrixHeight-1 - y;
-      }
-
-      float x_new = ( ( ( x - pivot_x  ) * cos(rotation) - ( y - pivot_y ) * sin(rotation) ) * zoom ) + pivot_x - states.offset_x;
-      float y_new = ( ( ( y - pivot_y  ) * sin(rotation) + ( y - pivot_y  )* cos(rotation) ) * zoom ) + pivot_y - states.offset_y;
-
-      LedMatrix[x_pos+y_pos] =  interpolate_colors_with_black(A, B, Func( x_new, y_new, t , states.function) );
-
-    }
-  }
+    drawPixel(x, y, interpolate_colors_with_black(A, B, Func( x_new, y_new, t , states.function) ));
+  } 
 }
 
 void adjust_gamma()
