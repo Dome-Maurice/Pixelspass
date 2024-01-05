@@ -1,0 +1,139 @@
+#include <Arduino.h>
+#include <FastLED.h>
+
+#define MatrixHeight        8
+#define MatrixLength        32
+#define MAX_POWER_MILLIAMPS 500
+#define LED_TYPE            WS2812B
+#define COLOR_ORDER         GRB
+#define DATA_PIN            4
+#define Brightness          100
+
+
+#define NUM_LEDS MatrixHeight*MatrixLength
+
+CRGB LedMatrix[NUM_LEDS];
+CRGB A,B,C;
+
+void genRandCol(CRGB& a, CRGB& b){
+  byte hue_a = 10;//random(0,255);
+  byte hue_b = (hue_a + 90 + random(0, 127))%360;
+  byte sat_a = 178 + random(0, 255-178);
+  byte sat_b = 178 + random(0, 255-178);
+
+  a = CHSV(hue_a,sat_a,255);
+  b = CHSV(hue_b,sat_b,255);
+
+}
+
+float Func(float x, float y, float t) {
+  //float v = sin( t - hypot( x-4, y-16 ) ); 
+  //float v = sin(( t-x/2-y/2));
+  float v = sin((t-hypot(x-40.5,y-3.5))*0.25) ;
+  return (v + 1.0 )/2;
+}
+
+
+CRGB interpolate_colors(CRGB& a, CRGB& b, float value){
+  CRGB X;
+  value = value*0xff;
+  X.r = lerp8by8(a.r, b.r, value);
+  X.g = lerp8by8(a.g, b.g, value);
+  X.b = lerp8by8(a.b, b.b, value);
+  return X;
+}
+
+CRGB interpolate_colors_with_black(CRGB& a, CRGB& b, float value){
+  CRGB X;
+  if(value > 0.5){
+    X.r = a.r * value; X.g = a.g * value; X.b = a.b * value;
+  }else if (value < 0.5)
+  {
+    X.r = b.r * value; X.g = b.g * value; X.b = b.b * value;
+  }else{
+    X.r = 0; X.g = 0; X.b = 0;
+  }
+  return X;
+}
+
+
+float state_offset_x = 0;
+float state_offset_y = 0;
+float state_translate_scale = 11;
+float state_move_x = 1;
+float state_move_y = 1;
+float state_pivot_x = 0;
+float state_pivot_y = 0;
+float state_rotate_scale = 0.1;
+float state_zoom_scale = 3;
+
+float offset_x = 0;
+float offset_y = 0;
+
+void Animation(float t, float dt){
+
+  float val = 0;
+
+  offset_x = offset_x + sin(0.3 + t * 0.17) * state_translate_scale + state_move_x * 100 * dt;
+  offset_y = offset_y + cos(0.7 + t * 0.05) * state_translate_scale + state_move_y * 100 * dt;
+
+  float pivot_x = state_pivot_x;
+  float pivot_y = state_pivot_y;
+
+  float zoom = 1.0;
+  if(state_zoom_scale != 0){
+    zoom = (sin(t * 0.1) * 0.5 + 0.5) * state_zoom_scale ;
+  }
+
+  float rotation = t * state_rotate_scale;
+
+  for(int x = 0; x < MatrixLength; ++x) {
+    int x_pos = x*MatrixHeight;
+    for(int y = 0; y < MatrixHeight; ++y) {
+
+      int y_pos = y;
+      if((x & 0x1)) {
+        y_pos = MatrixHeight-1 - y;
+      }
+
+      float x_new = ( ( ( x - pivot_x  ) * cos(rotation) - ( y - pivot_y ) * sin(rotation) ) * zoom ) + pivot_x - offset_x;
+      float y_new = ( ( ( y - pivot_y  ) * sin(rotation) + ( y - pivot_y  )* cos(rotation) ) * zoom ) + pivot_y - offset_y;
+
+      LedMatrix[x_pos+y_pos] =  interpolate_colors_with_black(A, B, Func( x_new, y_new, t ) );
+
+    }
+  }
+}
+
+void setup() {
+  FastLED.addLeds<LED_TYPE, DATA_PIN, COLOR_ORDER>(LedMatrix, NUM_LEDS).setCorrection( TypicalLEDStrip );
+  FastLED.setMaxPowerInVoltsAndMilliamps( 5, MAX_POWER_MILLIAMPS);
+  FastLED.setBrightness(Brightness);
+  Serial.begin(115200);
+  randomSeed(analogRead(0));
+
+  genRandCol(A, B);
+
+}
+
+
+void loop() {
+
+  unsigned long NewTime, OldTime = 0;
+  float seconds, Fps, dt = 0;
+
+  while(true){
+    NewTime = millis();    
+    dt = (NewTime - OldTime) / 1000.0;
+    OldTime = NewTime;
+    seconds += dt;  
+    Fps = 1.0/dt;
+
+    offset_x = ( offset_x + state_move_x * 5 ) / Fps ;
+    offset_y = ( offset_y + state_move_y * 5 ) / Fps ; 
+
+    Animation(seconds, dt);
+    FastLED.show();
+  }
+
+}
