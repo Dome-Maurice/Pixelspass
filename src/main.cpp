@@ -13,40 +13,10 @@
 #define NUM_LEDS MatrixHeight*MatrixLength
 
 CRGB LedMatrix[NUM_LEDS];
-CRGB LedStart[NUM_LEDS];
 CRGB LedTarget[NUM_LEDS];
 uint8_t easetime[NUM_LEDS] = {100};
 
-/* void setPixel(pixel& p, CRGB c){
-  p.target_c = c;
-  p.start_c = p.current_c;
-	p.easetime = 0;
-}
-
-CRGB getcolor(pixel& p, float dt)
-{
-	if (p.easetime <= 0){
-    p.easetime = 0;
-		p.start_c = p.target_c;
-		p.current_c = p.target_c;
-		return p.current_c;
-  }
-
-	if (p.easetime > 100)
-	{
-		return p.current_c;
-	}
-
-	float ratio = ease8InOutCubic( float(p.easetime) / float(100) );
-
-	p.current_c = blend(p.target_c, p.start_c, ratio);
-
-  p.easetime -= (int)(dt*1000);
-
-	return p.current_c;
-} */
-
-void genRandCol(CRGB& a, CRGB& b){
+void genRandCol(CHSV& a, CHSV& b){
   byte hue_a = random(0,255);
   byte hue_b = (hue_a + 90 + random(0, 127))%360;
   byte sat_a = 178 + random(0, 255-178);
@@ -91,13 +61,12 @@ float Func(float x, float y, float t, uint8_t i) {
  //float v = 2*fract( (0.5*t-x*0.01)*0.5+hypot(x-MatrixLength/2,y-MatrixHeight/2) )-1.0 ;
   return v ;//(v + 1.0 )/2;
 }
-CRGB interpolate_colors(CRGB& a, CRGB& b, float value){
-  CRGB X;
-  value = value*0xff;
-  X.r = lerp8by8(a.r, b.r, value);
-  X.g = lerp8by8(a.g, b.g, value);
-  X.b = lerp8by8(a.b, b.b, value);
-  return X;
+CHSV interpolate_HSV_colors(CHSV& a, CHSV& b, fract8 value){
+  return CHSV(
+      lerp8by8(a.h, b.h, value),
+      lerp8by8(a.s, b.s, value),
+      lerp8by8(a.v, b.v, value)
+    );
 }
 CRGB interpolate_colors_with_black(CRGB& a, CRGB& b, float value){
   CRGB X;
@@ -123,11 +92,10 @@ struct Animation_States{
   float rotate_scale = 0.1;
   float zoom_scale = 3;
   int color_change_time = 0;
-  float time_to_lerp_s = 2;
-  float lerp_time = 0;
+  int time_to_lerp_s = 5*1000;
+  int lerp_time = 0;
   int speed = 100;
-  CRGB A_old, B_old, A_new, B_new = 0;
-  CRGB A, B = 0;
+  CHSV A_old, B_old, A_new, B_new, A, B;
   uint8_t function = 3;
 };
 
@@ -144,51 +112,36 @@ CHSV lerp_rgb(CRGB& old_c, CRGB& new_c, fract8 value){
   return C;
 }
 
-CRGB lerp_toward_target_colors(CRGB& old, CRGB& target, float dt, Animation_States& states, float s){
-
-  CRGB X = 0;
-
-  if( ( (int)states.lerp_time <= (int)states.time_to_lerp_s ) && (target != old)){
+void lerp_toward_target_colors(int16_t dt, Animation_States& states){
+  if(states.lerp_time <= states.time_to_lerp_s-dt){
     states.lerp_time += dt;
-    //fract8 v = (int)( states.lerp_time / states.time_to_lerp_s )*0xff;
-    int v = (int)( 0xff * s * 0.1) % 0xff;
-    hsv2rgb_rainbow ( lerp_rgb(old, target, v) , X);   
+    fract8 v = ease8InOutQuad( ((float)states.lerp_time / (float)states.time_to_lerp_s) * 0xff );
+    states.A = interpolate_HSV_colors(states.A_old, states.A_new, v);
+    states.B = interpolate_HSV_colors(states.B_old, states.B_new, v);
+    //states.A = interpolate_colors(states.A_old, states.A_new, v);
+    //states.B = interpolate_colors(states.B_old, states.B_new, v);
   }else{
-    states.lerp_time = 0;
-    X = target;
-    old = target;
+    states.A = states.A_new;
+    states.B = states.B_new;
+    states.A_old = states.A_new;
+    states.B_old = states.B_new;
   }
- 
-
-  return X;
 }
 
 void setPixel(float x, float y, CRGB pixel_color){
-
   int x_pos = x*MatrixHeight;
   int y_pos = y;
   if(((int)x & 0x1)) {
     y_pos = MatrixHeight-1 - y;
   }
-
-  uint16_t index = x_pos+y_pos;
-  //LedTarget[index] =  pixel_color;
-
-  //LedStart[index] = LedMatrix[x_pos+y_pos];
-  LedMatrix[index] = pixel_color;
-
-  //setPixel(pMatrix[x_pos+y_pos], interpolate_colors_with_black(A, B, Func( x_new, y_new, t , states.function) ) );
+  LedTarget[ x_pos+y_pos ] = pixel_color;
 }
 
-void ease(uint16_t dt){
+void ease(float dt){
+  fract8 v = 127;
   for(uint16_t i = 0; i < NUM_LEDS; i++){
-    uint8_t ease_val = ((float)easetime[i] / 100.0)*0xff;
-    LedMatrix[i] = blend(LedTarget[i], LedStart[i], ease_val);
-    if(easetime[i]>dt){
-      easetime[i] -= dt;
-    }else{
-      easetime[i] = 100;
-    }
+    //hsv2rgb_rainbow ( lerp_rgb(LedMatrix[i], LedTarget[i], v) , LedMatrix[i]);
+    LedMatrix[i] = blend(LedMatrix[i], LedTarget[i], v);
   }
 }
 
@@ -225,20 +178,11 @@ void adjust_gamma()
 {
   for (uint16_t i = 0; i < NUM_LEDS; i++)
   {
-    LedMatrix[i].r = 	dim8_video (LedMatrix[i].r);
-    LedMatrix[i].g = 	dim8_video (LedMatrix[i].g);
-    LedMatrix[i].b = 	dim8_video (LedMatrix[i].b);
+    LedMatrix[i].r = 	dim8_lin (LedMatrix[i].r);
+    LedMatrix[i].g = 	dim8_lin (LedMatrix[i].g);
+    LedMatrix[i].b = 	dim8_lin (LedMatrix[i].b);
   }
-}
-
-void adjust_gamma2()
-{
-  for (uint16_t i = 0; i < NUM_LEDS; i++)
-  {
-    LedMatrix[i] = applyGamma_video(LedMatrix[i], 2.5);  
-  }
-}
-	
+}	
 
 void setup() {
   FastLED.addLeds<LED_TYPE, DATA_PIN, COLOR_ORDER>(LedMatrix, NUM_LEDS).setCorrection( TypicalPixelString );
@@ -248,21 +192,13 @@ void setup() {
   randomSeed(analogRead(0));
 }
 
-/* void display(float dt){
-  for (uint16_t i = 0; i < NUM_LEDS; i++){
-    LedMatrix[i] = getcolor(pMatrix[i], dt);
-    //Serial.println(v.r);
-  }
-  FastLED.show();
-} */
-
 void loop() {
 
   unsigned long NewTime, OldTime, dt_ms = 0;
   float seconds, Fps, dt = 0;
   Animation_States Ani_States;
   genRandCol(Ani_States.A, Ani_States.B);
-  Ani_States.function = random(0, 7);
+  //Ani_States.function = random(0, 7);
 
   while(true){
     NewTime = millis();    
@@ -272,23 +208,20 @@ void loop() {
     seconds += dt;   
 
     if((int)seconds >= Ani_States.color_change_time){
-      /* genRandCol(Ani_States.A_new, Ani_States.B_new);
+      genRandCol(Ani_States.A_new, Ani_States.B_new);
       Ani_States.A_old = Ani_States.A;
-      Ani_States.B_old = Ani_States.B;*/
-      Ani_States.color_change_time = seconds + random(10, 60); 
+      Ani_States.B_old = Ani_States.B;
+      Ani_States.color_change_time = seconds + random(6, 10);
+      Ani_States.lerp_time = 0;
       //Ani_States.function = random(0, 7);
     } 
- 
 
-    //Ani_States.A = lerp_toward_target_colors(Ani_States.A_old, Ani_States.A_new, dt, Ani_States, seconds);
-    //Ani_States.B = lerp_toward_target_colors(Ani_States.B_old, Ani_States.B_new, dt, Ani_States, seconds);
+    lerp_toward_target_colors(dt_ms, Ani_States);
 
     Animation(seconds, dt, Ani_States);
     //napplyGamma_video(LedMatrix, NUM_LEDS, 2.2);
-    //ease(dt_ms);
+    ease(dt);
     adjust_gamma();
-    //blur1d(LedMatrix , 256 , 32 );
-    //display(dt);
     FastLED.show();
   }
 
