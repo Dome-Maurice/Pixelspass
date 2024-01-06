@@ -90,23 +90,49 @@ CHSV interpolate_colors_with_black_rainbow(CHSV& a, CHSV& b, float value){
   {
     return CHSV(b.h * -value, b.s, b.v);
   }else{
-    return CHSV(0,0,0);
+    //return CHSV(0,0,0);
+    return CHSV(( ( a.h + b.h ) / 2 ),  ( ( a.s + b.s ) / 2 ) , ( ( a.v + b.v ) / 2 ));
   }
 }
 
 CHSV interpolate_colors_with_black_s(CHSV& a, CHSV& b, float value){
 
   if(value > 0){
-    return CHSV(a.h, a.s * value, a.v);
+    return CHSV(a.h, a.s * value, a.v * value);
   }else if (value < 0)
   {
-    return CHSV(b.h, b.s * -value, b.v);
+    return CHSV(b.h, b.s * -value, b.v * -value);
   }else{
-    return CHSV(0,0,0);
+    return CHSV( 0, 0 , 0 );
+  }
+}
+
+CHSV interpolate_colors_with_sat(CHSV& a, CHSV& b, float value){
+
+  if(value > 0){
+    return CHSV(a.h, a.s * value, a.v * value);
+  }else if (value < 0)
+  {
+    return CHSV(b.h, b.s * -value, b.v * -value);
+  }else{
+    return CHSV( 0, 0 , 0 );
   }
 }
 
 CHSV interpolate_colors_with_black_s_inv(CHSV& a, CHSV& b, float value){
+
+  if(value > 0){
+    return CHSV(a.h, 0xff-(a.s * value), a.v * value);
+  }else if (value < 0)
+  {
+    return CHSV(b.h, 0xff-(b.s * -value), b.v * -value);
+  }else{
+    //return CHSV(0,0,0);
+    return CHSV( ( ( a.h + b.h ) / 2 ) , ( ( a.s + b.s ) / 2 ) , 0xff );
+  }
+}
+
+CHSV interpolate_colors_with_s_inv(CHSV& a, CHSV& b, float value){
 
   if(value > 0){
     return CHSV(a.h, 0xff-(a.s * value), a.v);
@@ -114,7 +140,8 @@ CHSV interpolate_colors_with_black_s_inv(CHSV& a, CHSV& b, float value){
   {
     return CHSV(b.h, 0xff-(b.s * -value), b.v);
   }else{
-    return CHSV(0,0,0);
+    //return CHSV(0,0,0);
+    return CHSV( ( ( a.h + b.h ) / 2 ) , ( ( a.s + b.s ) / 2 )  , 0xff );
   }
 }
 
@@ -207,7 +234,7 @@ void Animation(float t, float dt, Animation_States& states){
     float y_new = ( ( ( y - pivot_y  ) * sin(rotation) + ( y - pivot_y  )* cos(rotation) ) * zoom ) + pivot_y - states.offset_y;
     //setPixel(x, y, interpolate_colors_with_black_rainbow(A, B, Func( x_new, y_new, t , states.function) ));
     //setPixel(x, y, interpolate_colors_with_black(A, B, Func( x_new, y_new, t , states.function) ));
-    setPixel(x, y, interpolate_colors_with_black_s(A, B, Func( x_new, y_new, t , states.function) ));
+    setPixel(x, y, interpolate_colors_with_s_inv(A, B, Func( x_new, y_new, t , states.function) ));
   } 
 }
 
