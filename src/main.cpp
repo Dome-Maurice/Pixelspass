@@ -68,7 +68,7 @@ CHSV interpolate_HSV_colors(CHSV& a, CHSV& b, fract8 value){
       lerp8by8(a.v, b.v, value)
     );
 }
-CRGB interpolate_colors_with_black(CRGB& a, CRGB& b, float value){
+/* CRGB interpolate_colors_with_black(CRGB& a, CRGB& b, float value){
   CRGB X;
 
   if(value > 0){
@@ -80,7 +80,56 @@ CRGB interpolate_colors_with_black(CRGB& a, CRGB& b, float value){
     X.r = 0; X.g = 0; X.b = 0;
   }
   return X;
+} */
+
+CHSV interpolate_colors_with_black_rainbow(CHSV& a, CHSV& b, float value){
+
+  if(value > 0){
+    return CHSV(a.h * value, a.s, a.v);
+  }else if (value < 0)
+  {
+    return CHSV(b.h * -value, b.s, b.v);
+  }else{
+    return CHSV(0,0,0);
+  }
 }
+
+CHSV interpolate_colors_with_black_s(CHSV& a, CHSV& b, float value){
+
+  if(value > 0){
+    return CHSV(a.h, a.s * value, a.v);
+  }else if (value < 0)
+  {
+    return CHSV(b.h, b.s * -value, b.v);
+  }else{
+    return CHSV(0,0,0);
+  }
+}
+
+CHSV interpolate_colors_with_black_s_inv(CHSV& a, CHSV& b, float value){
+
+  if(value > 0){
+    return CHSV(a.h, 0xff-(a.s * value), a.v);
+  }else if (value < 0)
+  {
+    return CHSV(b.h, 0xff-(b.s * -value), b.v);
+  }else{
+    return CHSV(0,0,0);
+  }
+}
+
+CHSV interpolate_colors_with_black(CHSV& a, CHSV& b, float value){
+
+  if(value > 0){
+    return CHSV(a.h, a.s, a.v * value);
+  }else if (value < 0)
+  {
+    return CHSV(b.h, b.s, b.v * -value);
+  }else{
+    return CHSV(0,0,0);
+  }
+}
+
 struct Animation_States{
   float offset_x = 0;
   float offset_y = 0;
@@ -99,18 +148,6 @@ struct Animation_States{
   uint8_t function = 3;
 };
 
-CHSV lerp_rgb(CRGB& old_c, CRGB& new_c, fract8 value){
-  CHSV C;
-
-  CHSV a = rgb2hsv_approximate (old_c);
-  CHSV b = rgb2hsv_approximate (new_c);
-
-  C.h = lerp8by8(a.h, b.h, value);
-  C.s = lerp8by8(a.s, b.s, value);
-  C.v = lerp8by8(a.v, b.v, value);
-
-  return C;
-}
 
 void lerp_toward_target_colors(int16_t dt, Animation_States& states){
   if(states.lerp_time <= states.time_to_lerp_s-dt){
@@ -118,8 +155,6 @@ void lerp_toward_target_colors(int16_t dt, Animation_States& states){
     fract8 v = ease8InOutQuad( ((float)states.lerp_time / (float)states.time_to_lerp_s) * 0xff );
     states.A = interpolate_HSV_colors(states.A_old, states.A_new, v);
     states.B = interpolate_HSV_colors(states.B_old, states.B_new, v);
-    //states.A = interpolate_colors(states.A_old, states.A_new, v);
-    //states.B = interpolate_colors(states.B_old, states.B_new, v);
   }else{
     states.A = states.A_new;
     states.B = states.B_new;
@@ -149,8 +184,8 @@ void Animation(float t, float dt, Animation_States& states){
 
   float val = 0;
 
-  CRGB A = states.A;
-  CRGB B = states.B;
+  CHSV A = states.A;
+  CHSV B = states.B;
 
   states.offset_x = dt * ( states.offset_x + states.move_x * 5 + states.move_x * states.speed ) + sin(0.3 + t * 0.17) * states.translate_scale;
   states.offset_y = dt * ( states.offset_y + states.move_y * 5 + states.move_y * states.speed ) + cos(0.7 + t * 0.05) * states.translate_scale;
@@ -170,7 +205,9 @@ void Animation(float t, float dt, Animation_States& states){
     uint16_t y = i%MatrixHeight;
     float x_new = ( ( ( x - pivot_x  ) * cos(rotation) - ( y - pivot_y ) * sin(rotation) ) * zoom ) + pivot_x - states.offset_x;
     float y_new = ( ( ( y - pivot_y  ) * sin(rotation) + ( y - pivot_y  )* cos(rotation) ) * zoom ) + pivot_y - states.offset_y;
-    setPixel(x, y, interpolate_colors_with_black(A, B, Func( x_new, y_new, t , states.function) ));
+    //setPixel(x, y, interpolate_colors_with_black_rainbow(A, B, Func( x_new, y_new, t , states.function) ));
+    //setPixel(x, y, interpolate_colors_with_black(A, B, Func( x_new, y_new, t , states.function) ));
+    setPixel(x, y, interpolate_colors_with_black_s(A, B, Func( x_new, y_new, t , states.function) ));
   } 
 }
 
